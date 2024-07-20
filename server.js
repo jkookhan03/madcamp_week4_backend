@@ -2,6 +2,7 @@ const express = require('express');
 const axios = require('axios');
 const OpenAI = require('openai');
 const cors = require('cors');
+const mysql = require('mysql');
 require('dotenv').config();
 
 const app = express();
@@ -9,9 +10,26 @@ const port = 80;
 
 // CORS 미들웨어 설정
 app.use(cors());
+app.use(express.json());
 
 const MUSIXMATCH_API_KEY = process.env.MUSIXMATCH_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+
+// MySQL 데이터베이스 연결 설정
+const db = mysql.createConnection({
+  host: 'localhost',
+  user: 'root',
+  password: '1234',
+  database: 'madcamp_week4'
+});
+
+db.connect((err) => {
+  if (err) {
+    console.error('Error connecting to the database:', err);
+    return;
+  }
+  console.log('Connected to the MySQL database.');
+});
 
 // OpenAI API 클라이언트 설정
 const openai = new OpenAI({
@@ -46,6 +64,32 @@ app.get('/lyrics', async (req, res) => {
     console.error('Error fetching lyrics or translating:', error.response ? error.response.data : error.message);
     res.status(500).send('Error fetching lyrics or translating');
   }
+});
+
+app.post('/saveUser', (req, res) => {
+  const { id, email, display_name, country, followers, profile_image_url, product } = req.body;
+
+  const query = `
+    INSERT INTO users (id, email, display_name, country, followers, profile_image_url, product)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON DUPLICATE KEY UPDATE
+      email = VALUES(email),
+      display_name = VALUES(display_name),
+      country = VALUES(country),
+      followers = VALUES(followers),
+      profile_image_url = VALUES(profile_image_url),
+      product = VALUES(product)
+  `;
+
+  const values = [id, email, display_name, country, followers, profile_image_url, product];
+
+  db.query(query, values, (err, results) => {
+    if (err) {
+      console.error('Error saving user to the database:', err);
+      return res.status(500).send('Error saving user to the database');
+    }
+    res.send('User saved successfully');
+  });
 });
 
 async function translateLyrics(lyrics, targetLang) {
