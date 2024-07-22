@@ -110,6 +110,83 @@ async function translateLyrics(lyrics, targetLang) {
   }
 }
 
+// 게시물 저장 API
+app.post('/posts', (req, res) => {
+  const { title, content, backgroundImage } = req.body;  // backgroundImage 추가
+  const query = 'INSERT INTO posts (title, content, background_image) VALUES (?, ?, ?)';  // background_image 추가
+  db.query(query, [title, JSON.stringify(content), backgroundImage], (error, results) => {
+    if (error) {
+      console.error('Error inserting post:', error);
+      res.status(500).send('Server error');
+      return;
+    }
+    res.status(200).send({ success: true, id: results.insertId });
+  });
+});
+
+// 게시물 불러오기 API
+app.get('/posts', (req, res) => {
+  const query = 'SELECT * FROM posts';
+  db.query(query, (error, results) => {
+    if (error) {
+      console.error('Error fetching posts:', error);
+      res.status(500).send('Server error');
+      return;
+    }
+    const posts = results.map(row => ({
+      id: row.id,
+      title: row.title,
+      content: JSON.parse(row.content),
+      backgroundImage: row.background_image,  // background_image 추가
+    }));
+    res.status(200).send(posts);
+  });
+});
+
+// 개별 게시물 불러오기 API
+app.get('/posts/:id', (req, res) => {
+  const { id } = req.params;
+  const query = 'SELECT * FROM posts WHERE id = ?';
+  db.query(query, [id], (error, results) => {
+    if (error) {
+      console.error('Error fetching post:', error);
+      res.status(500).send('Server error');
+      return;
+    }
+    if (results.length === 0) {
+      res.status(404).send('Post not found');
+      return;
+    }
+    const post = {
+      id: results[0].id,
+      title: results[0].title,
+      content: JSON.parse(results[0].content),
+      backgroundImage: results[0].background_image,  // background_image 추가
+    };
+    res.status(200).send(post);
+  });
+});
+
+// OpenAI DALL-E 이미지 생성 API
+app.post('/generate-image', async (req, res) => {
+  const { description } = req.body;
+
+  try {
+    const response = await openai.images.generate({
+      model: "dall-e-3",
+      prompt: description,
+      n: 1,
+      size: "1024x1024",
+    });
+    const imageUrl = response.data[0].url;
+    res.status(200).json({ imageUrl });
+  } catch (error) {
+    console.error('Error generating image:', error.response ? error.response.data : error.message);
+    res.status(500).send('Error generating image');
+  }
+});
+
+
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
