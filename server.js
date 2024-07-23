@@ -5,6 +5,7 @@ const cors = require('cors');
 const mysql = require('mysql');
 const multer = require('multer'); // 파일 업로드를 위한 Multer 모듈 추가
 const fs = require('fs');
+const path = require('path'); // 경로 조작을 위한 path 모듈 추가
 require('dotenv').config();
 
 const app = express();
@@ -39,7 +40,7 @@ const openai = new OpenAI({
 // Multer 설정
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'public/uploads/');
+    cb(null, path.join(__dirname, 'public/uploads/')); // 절대 경로 사용
   },
   filename: function (req, file, cb) {
     cb(null, Date.now() + '-' + file.originalname);
@@ -47,6 +48,10 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage: storage });
+
+// 절대 경로 출력
+const uploadsDir = path.join(__dirname, 'public/uploads/');
+console.log(`Uploads directory absolute path: ${uploadsDir}`);
 
 app.post('/generate-image', async (req, res) => {
   const { description } = req.body;
@@ -59,7 +64,7 @@ app.post('/generate-image', async (req, res) => {
       size: "1024x1024",
     });
     const imageUrl = response.data[0].url;
-    const imagePath = 'public/uploads/' + Date.now() + '.png';
+    const imagePath = path.join(__dirname, 'public/uploads/', Date.now() + '.png'); // 절대 경로 사용
     
     const writer = fs.createWriteStream(imagePath);
     const downloadResponse = await axios({
@@ -71,7 +76,7 @@ app.post('/generate-image', async (req, res) => {
     downloadResponse.data.pipe(writer);
 
     writer.on('finish', () => {
-      res.status(200).json({ imageUrl: imagePath.replace('public/', '') });
+      res.status(200).json({ imageUrl: imagePath.replace(path.join(__dirname, 'public/'), '') });
     });
 
     writer.on('error', (error) => {
@@ -82,6 +87,15 @@ app.post('/generate-image', async (req, res) => {
     console.error('Error generating image:', error.response ? error.response.data : error.message);
     res.status(500).send('Error generating image');
   }
+});
+
+// 이미지 업로드 엔드포인트 추가
+app.post('/upload-image', upload.single('image'), (req, res) => {
+  const file = req.file;
+  if (!file) {
+    return res.status(400).send('No file uploaded.');
+  }
+  res.status(200).json({ imageUrl: `uploads/${file.filename}` });
 });
 
 // 기타 API 엔드포인트
