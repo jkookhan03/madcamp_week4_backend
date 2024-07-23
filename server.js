@@ -3,19 +3,20 @@ const axios = require('axios');
 const OpenAI = require('openai');
 const cors = require('cors');
 const mysql = require('mysql');
+const multer = require('multer'); // 파일 업로드를 위한 Multer 모듈 추가
+const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
 const port = 80;
 
-// CORS 미들웨어 설정
 app.use(cors());
 app.use(express.json());
+app.use(express.static('public')); // public 폴더를 정적 파일 제공 폴더로 설정
 
 const MUSIXMATCH_API_KEY = process.env.MUSIXMATCH_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-// MySQL 데이터베이스 연결 설정
 const db = mysql.createConnection({
   host: 'localhost',
   user: 'root',
@@ -31,11 +32,59 @@ db.connect((err) => {
   console.log('Connected to the MySQL database.');
 });
 
-// OpenAI API 클라이언트 설정
 const openai = new OpenAI({
   apiKey: OPENAI_API_KEY,
 });
 
+// Multer 설정
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'public/uploads/');
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + '-' + file.originalname);
+  }
+});
+
+const upload = multer({ storage: storage });
+
+app.post('/generate-image', async (req, res) => {
+  const { description } = req.body;
+
+  try {
+    const response = await openai.images.generate({
+      model: "dall-e-3",
+      prompt: description,
+      n: 1,
+      size: "1024x1024",
+    });
+    const imageUrl = response.data[0].url;
+    const imagePath = 'public/uploads/' + Date.now() + '.png';
+    
+    const writer = fs.createWriteStream(imagePath);
+    const downloadResponse = await axios({
+      url: imageUrl,
+      method: 'GET',
+      responseType: 'stream'
+    });
+
+    downloadResponse.data.pipe(writer);
+
+    writer.on('finish', () => {
+      res.status(200).json({ imageUrl: imagePath.replace('public/', '') });
+    });
+
+    writer.on('error', (error) => {
+      console.error('Error saving image:', error);
+      res.status(500).send('Error saving image');
+    });
+  } catch (error) {
+    console.error('Error generating image:', error.response ? error.response.data : error.message);
+    res.status(500).send('Error generating image');
+  }
+});
+
+// 기타 API 엔드포인트
 app.get('/lyrics', async (req, res) => {
   const { track, artist, targetLang } = req.query;
 
@@ -69,8 +118,8 @@ app.get('/lyrics', async (req, res) => {
 app.post('/saveUser', (req, res) => {
   const { id, email, display_name, country, followers, profile_image_url, product } = req.body;
 
-  const query = `
-    INSERT INTO users (id, email, display_name, country, followers, profile_image_url, product)
+  const query = 
+    `INSERT INTO users (id, email, display_name, country, followers, profile_image_url, product)
     VALUES (?, ?, ?, ?, ?, ?, ?)
     ON DUPLICATE KEY UPDATE
       email = VALUES(email),
@@ -78,8 +127,7 @@ app.post('/saveUser', (req, res) => {
       country = VALUES(country),
       followers = VALUES(followers),
       profile_image_url = VALUES(profile_image_url),
-      product = VALUES(product)
-  `;
+      product = VALUES(product);`;
 
   const values = [id, email, display_name, country, followers, profile_image_url, product];
 
@@ -166,26 +214,6 @@ app.get('/posts/:id', (req, res) => {
     res.status(200).send(post);
   });
 });
-
-// OpenAI DALL-E 이미지 생성 API
-app.post('/generate-image', async (req, res) => {
-  const { description } = req.body;
-
-  try {
-    const response = await openai.images.generate({
-      model: "dall-e-3",
-      prompt: description,
-      n: 1,
-      size: "1024x1024",
-    });
-    const imageUrl = response.data[0].url;
-    res.status(200).json({ imageUrl });
-  } catch (error) {
-    console.error('Error generating image:', error.response ? error.response.data : error.message);
-    res.status(500).send('Error generating image');
-  }
-});
-
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
