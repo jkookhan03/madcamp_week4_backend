@@ -1,4 +1,5 @@
 const express = require('express');
+const https = require('https');
 const axios = require('axios');
 const OpenAI = require('openai');
 const cors = require('cors');
@@ -31,6 +32,21 @@ db.connect((err) => {
     return;
   }
   console.log('Connected to the MySQL database.');
+});
+
+const options = {
+  key: fs.readFileSync('server.key'),
+  cert: fs.readFileSync('server.cert')
+};
+
+const httpsServer = https.createServer(options, app);
+
+app.get('/', (req, res) => {
+  res.send('Hello HTTPS World!');
+});
+
+httpsServer.listen(port, () => {
+  console.log(`HTTPS Server running on port ${port}`);
 });
 
 const openai = new OpenAI({
@@ -229,6 +245,3 @@ app.get('/posts/:id', (req, res) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-});
