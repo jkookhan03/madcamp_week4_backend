@@ -19,7 +19,7 @@ const MUSIXMATCH_API_KEY = process.env.MUSIXMATCH_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 const db = mysql.createConnection({
-  host: 'localhost',
+  host: '127.0.0.1',
   user: 'root',
   password: '1234',
   database: 'madcamp_week4'
