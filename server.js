@@ -9,7 +9,7 @@ const path = require('path'); // 경로 조작을 위한 path 모듈 추가
 require('dotenv').config();
 
 const app = express();
-const port = 80;
+const port = 3000;
 
 app.use(cors());
 app.use(express.json());
