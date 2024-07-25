@@ -86,7 +86,8 @@ app.post('/generate-image', async (req, res) => {
     const downloadResponse = await axios({
       url: imageUrl,
       method: 'GET',
-      responseType: 'stream'
+      responseType: 'stream',
+      httpsAgent: new https.Agent({ rejectUnauthorized: false }) // SSL 검증 무시 설정 추가
     });
 
     downloadResponse.data.pipe(writer);
@@ -125,6 +126,7 @@ app.get('/lyrics', async (req, res) => {
         q_artist: artist,
         apikey: MUSIXMATCH_API_KEY,
       },
+      httpsAgent: new https.Agent({ rejectUnauthorized: false }) // SSL 검증 무시 설정 추가
     });
 
     const lyrics = lyricsResponse.data.message.body.lyrics.lyrics_body;
@@ -244,4 +246,3 @@ app.get('/posts/:id', (req, res) => {
     res.status(200).send(post);
   });
 });
-
